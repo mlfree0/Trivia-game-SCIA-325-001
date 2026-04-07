@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trivia Game</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Welcome to Trivia Game!</h1>
+      <p>Select a category, place your wager, and answer the question.</p>
+    </header>
+
+    <main class="game-box">
+
+      <!-- Start Screen -->
+      <section id="start-screen">
+        <h2>Choose a Category</h2>
+        <p>Please select from the following categories:</p>
+
+        <div id="category-list" class="category-list">
+          <button class="category-btn">Category 1</button>
+          <button class="category-btn">Category 2</button>
+          <button class="category-btn">Category 3</button>
+        </div>
+
+        <div class="wager-box">
+          <label for="wager">Place your wager:</label>
+          <input type="number" id="wager" min="1" placeholder="Enter wager" />
+        </div>
+
+        <button id="begin-btn">Start Question</button>
+      </section>
+
+      <!-- Question Screen -->
+      <section id="question-screen" style="display:none;">
+        <div class="top-bar">
+          <p id="selected-category">Category:</p>
+          <p id="score">Score: 0</p>
+        </div>
+
+        <h2 id="question-text">Question goes here</h2>
+
+        <div id="answer-buttons" class="answer-buttons">
+          <button class="answer-btn">A)</button>
+          <button class="answer-btn">B)</button>
+          <button class="answer-btn">C)</button>
+          <button class="answer-btn">D)</button>
+        </div>
+      </section>
+
+      <!-- Result Screen -->
+      <section id="result-screen" style="display:none;">
+        <h2 id="result-message">Correct!</h2>
+        <p id="score-change">Your score changed.</p>
+        <p id="updated-score">Score: 0</p>
+
+        <button id="play-again-btn">Play Again</button>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="question.js"></script>
+  <script src="triviaMain.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
