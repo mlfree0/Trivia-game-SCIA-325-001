@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trivia Game</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #f4f4f4; color: #222; }
+    .container { max-width: 950px; margin: 40px auto; padding: 20px; }
+    .game-box { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+    h1, h2, p { margin-top: 0; }
+    .category-list, .answer-buttons, .player-list { display: grid; gap: 12px; margin: 16px 0; }
+    button { padding: 12px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
+    .category-btn, .answer-btn, #begin-btn, #next-turn-btn, #start-game-btn, #play-again-btn, #reset-game-btn { background: #1f4fa3; color: white; }
+    .category-btn.selected { background: #111; border: 2px solid #000; }
+    .answer-btn:disabled { cursor: not-allowed; opacity: 0.8; }
+    .wager-box, .setup-box { margin: 16px 0; }
+    input[type="number"], input[type="text"], select { width: 100%; max-width: 280px; padding: 10px; font-size: 16px; margin-top: 8px; margin-bottom: 8px; }
+    .top-bar, .scoreboard { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; font-weight: bold; }
+    .score-card { background: #eef2f8; padding: 10px 14px; border-radius: 8px; min-width: 130px; }
+    .score-card.active { background: #1f4fa3; color: white; }
+    .hidden { display: none; }
+    .small-note { font-size: 14px; color: #555; }
+    .winner-box { padding: 14px; border-radius: 8px; background: #eef2f8; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Welcome to Trivia Game!</h1>
+      <p>Choose single player or multiplayer, select a category, wager points, and keep score.</p>
+    </header>
+
+    <main class="game-box">
+      <section id="setup-screen">
+        <h2>Game Setup</h2>
+        <p>Select your game mode and get started.</p>
+        <div class="setup-box">
+          <label for="game-mode">Select Game Mode:</label><br>
+          <select id="game-mode">
+            <option value="single">Single Player</option>
+            <option value="multi">Multiplayer</option>
+          </select>
+        </div>
+        <div class="setup-box">
+          <label for="player-count">Number of players:</label><br>
+          <select id="player-count">
+            <option value="2">2 Players</option>
+            <option value="3">3 Players</option>
+            <option value="4">4 Players</option>
+          </select>
+        </div>
+        <div class="setup-box">
+          <label for="max-turns">Number of total turns:</label><br>
+          <select id="max-turns">
+            <option value="10">10 Turns</option>
+            <option value="20">20 Turns</option>
+            <option value="30">30 Turns</option>
+            <option value="50">50 Turns</option>
+          </select>
+        </div>
+        <div id="player-name-fields" class="player-list"></div>
+        <button id="start-game-btn" type="button">Start Game</button>
+      </section>
+
+      <section id="start-screen" class="hidden">
+        <div class="scoreboard" id="scoreboard"></div>
+        <h2 id="turn-label">Player Turn</h2>
+        <p>Please select from the following categories:</p>
+        <div id="category-list" class="category-list">
+          <button class="category-btn" type="button">Category 1</button>
+          <button class="category-btn" type="button">Category 2</button>
+          <button class="category-btn" type="button">Category 3</button>
+        </div>
+        <div class="wager-box">
+          <label for="wager">Place your wager:</label><br>
+          <input type="number" id="wager" min="10" max="100" step="10" placeholder="10-100, multiples of 10" />
+          <p class="small-note">Wagers must be between 10 and 100 and must be multiples of 10.</p>
+        </div>
+        <button id="begin-btn" type="button">Start Question</button>
+      </section>
+
+      <section id="question-screen" class="hidden">
+        <div class="scoreboard" id="scoreboard-question"></div>
+        <div class="top-bar"><p id="selected-category">Category:</p><p id="current-player">Current Player:</p></div>
+        <h2 id="question-text">Question goes here</h2>
+        <div id="answer-buttons" class="answer-buttons">
+          <button class="answer-btn" type="button">A)</button>
+          <button class="answer-btn" type="button">B)</button>
+          <button class="answer-btn" type="button">C)</button>
+          <button class="answer-btn" type="button">D)</button>
+        </div>
+      </section>
+
+      <section id="result-screen" class="hidden">
+        <div class="scoreboard" id="scoreboard-result"></div>
+        <h2 id="result-message">Correct!</h2>
+        <p id="score-change">Your score has been updated.</p>
+        <p id="updated-score">Score: 0</p>
+        <button id="next-turn-btn" type="button">Next Player</button>
+        <button id="play-again-btn" type="button">New Game</button>
+      </section>
+
+      <section id="game-over-screen" class="hidden">
+        <h2>Game Over</h2>
+        <div class="scoreboard" id="scoreboard-final"></div>
+        <div id="winner-message" class="winner-box"></div>
+        <button id="reset-game-btn" type="button">Play Again</button>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    class Question {
+      constructor(name = "", category = "", correctAnswer = "", wrongAnswer1 = "", wrongAnswer2 = "", wrongAnswer3 = "") {
+        this.name = name; this.category = category; this.correctAnswer = correctAnswer;
+        this.wrongAnswer1 = wrongAnswer1; this.wrongAnswer2 = wrongAnswer2; this.wrongAnswer3 = wrongAnswer3;
+      }
+      getName() { return this.name; }
+      getCategory() { return this.category; }
+      getCorrectAnswer() { return this.correctAnswer; }
+      getWrongAnswer1() { return this.wrongAnswer1; }
+      getWrongAnswer2() { return this.wrongAnswer2; }
+      getWrongAnswer3() { return this.wrongAnswer3; }
+    }
+
+    const allQuestions = [
+      {
+            "name": "In what year did Star Wars release?",
+            "category": "Movies",
+            "correctAnswer": "1977",
+            "wrongAnswer1": "1980",
+            "wrongAnswer2": "1975",
+            "wrongAnswer3": "1982"
+      },
+      {
+            "name": "What team won Superbowl 60?",
+            "category": "Sports",
+            "correctAnswer": "Seattle Seahawks",
+            "wrongAnswer1": "Kansas City Chiefs",
+            "wrongAnswer2": "New England Patriots",
+            "wrongAnswer3": "Denver Broncos"
+      },
+      {
+            "name": "How many $500 bills are included in a modern edition of Monopoly?",
+            "category": "Board Games",
+            "correctAnswer": "40",
+            "wrongAnswer1": "20",
+            "wrongAnswer2": "30",
+            "wrongAnswer3": "25"
+      },
+      {
+            "name": "In what year did the American Revolution end?",
+            "category": "American History",
+            "correctAnswer": "1783",
+            "wrongAnswer1": "1778",
+            "wrongAnswer2": "1780",
+            "wrongAnswer3": "1786"
+      },
+      {
+            "name": "How many dice are used in a game of Yatzee?",
+            "category": "Board Games",
+            "correctAnswer": "5 Dice",
+            "wrongAnswer1": "6 Dice",
+            "wrongAnswer2": "10 Dice",
+            "wrongAnswer3": "3 Dice"
+      },
+      {
+            "name": "What videogame contains the famous \"BLJ\" glitch?",
+            "category": "Videogames",
+            "correctAnswer": "Super Mario 64",
+            "wrongAnswer1": "The Legend of Zelda: Ocarina of Time",
+            "wrongAnswer2": "Donkey Kong 64",
+            "wrongAnswer3": "Crash Bandicoot"
+      },
+      {
+            "name": "What is the only planet in our solar system to rotate clockwise on its axis?",
+            "category": "Astronomy",
+            "correctAnswer": "Venus",
+            "wrongAnswer1": "Mercury",
+            "wrongAnswer2": "Jupiter",
+            "wrongAnswer3": "Neptune"
+      },
+      {
+            "name": "How many states does the Appalachian Trail cross?",
+            "category": "Geography",
+            "correctAnswer": "14",
+            "wrongAnswer1": "8",
+            "wrongAnswer2": "10",
+            "wrongAnswer3": "16"
+      },
+      {
+            "name": "M&MâS Fruit Chews would eventually become what popular candy?",
+            "category": "Food",
+            "correctAnswer": "Starburst",
+            "wrongAnswer1": "Skittles",
+            "wrongAnswer2": "Hi-Chew",
+            "wrongAnswer3": "Dots"
+      },
+      {
+            "name": "What guitarist performed on the Michael Jackson song \"Beat it\"?",
+            "category": "Music",
+            "correctAnswer": "Eddie Van Halen",
+            "wrongAnswer1": "Jimmy Page",
+            "wrongAnswer2": "Randy Rhoades",
+            "wrongAnswer3": "Stevie Ray Vaughn"
+      },
+      {
+            "name": "Which of these Sci-Fi movies did Steven Spielburg not help create?",
+            "category": "Movies",
+            "correctAnswer": "2001: A Space Odessey",
+            "wrongAnswer1": "Back to the Future",
+            "wrongAnswer2": "Ready Player One",
+            "wrongAnswer3": "E.T."
+      },
+      {
+            "name": "Whatâs the diameter of a basketball hoop in inches?",
+            "category": "Sports",
+            "correctAnswer": "18 inches",
+            "wrongAnswer1": "14 inches",
+            "wrongAnswer2": "20 inches",
+            "wrongAnswer3": "17 inches"
+      },
+      {
+            "name": "In what year was the first Scrabble board game sold?",
+            "category": "Board Games",
+            "correctAnswer": "1948",
+            "wrongAnswer1": "1961",
+            "wrongAnswer2": "1954",
+            "wrongAnswer3": "1966"
+      },
+      {
+            "name": "Who was the 23rd President of the United States?",
+            "category": "American History",
+            "correctAnswer": "Benjamin Harrison",
+            "wrongAnswer1": "James Buchanan",
+            "wrongAnswer2": "Theodore Roosevelt",
+            "wrongAnswer3": "Woodrow Wilson"
+      },
+      {
+            "name": "How many herbs and spices are in Colonel Sandersâ original KFC recipe?",
+            "category": "Food",
+            "correctAnswer": "11",
+            "wrongAnswer1": "5",
+            "wrongAnswer2": "8",
+            "wrongAnswer3": "13"
+      },
+      {
+            "name": "Which videogame series features a half demon who wields a sword and twin pistols?",
+            "category": "Videogames",
+            "correctAnswer": "Devil May Cry",
+            "wrongAnswer1": "Resident Evil",
+            "wrongAnswer2": "Kid Icarus",
+            "wrongAnswer3": "Persona"
+      },
+      {
+            "name": "What galaxy is the closest to the Milky Way?",
+            "category": "Astronomy",
+            "correctAnswer": "Andromeda Galaxy",
+            "wrongAnswer1": "Black Eye Galaxy",
+            "wrongAnswer2": "Helix Galaxy",
+            "wrongAnswer3": "Southern Pinwheel Galaxy"
+      },
+      {
+            "name": "Which of these countries is landlocked?",
+            "category": "Geography",
+            "correctAnswer": "Austria",
+            "wrongAnswer1": "Germany",
+            "wrongAnswer2": "Bulgeria",
+            "wrongAnswer3": "Latvia"
+      },
+      {
+            "name": "What was the first pizza restaurant chain to deliver?",
+            "category": "Food",
+            "correctAnswer": "Domino's",
+            "wrongAnswer1": "Pizza Hut",
+            "wrongAnswer2": "Fox's Den",
+            "wrongAnswer3": "Little Caeser's"
+      },
+      {
+            "name": "Which of these bands has a one-armed drummer?",
+            "category": "Music",
+            "correctAnswer": "Def Leppard",
+            "wrongAnswer1": "Metallica",
+            "wrongAnswer2": "Van Halen",
+            "wrongAnswer3": "Whitesnake"
+      },
+      {
+            "name": "Which of these mythical gods is not from Greece?",
+            "category": "Mythology",
+            "correctAnswer": "Jupiter",
+            "wrongAnswer1": "Ares",
+            "wrongAnswer2": "Hephaestus",
+            "wrongAnswer3": "Athena"
+      },
+      {
+            "name": "Who is the Greek god of Wine?",
+            "category": "Mythology",
+            "correctAnswer": "Dionysus",
+            "wrongAnswer1": "Hermes",
+            "wrongAnswer2": "Zeus",
+            "wrongAnswer3": "Apollo"
+      },
+      {
+            "name": "Who is the Greek god of the dead?",
+            "category": "Mythology",
+            "correctAnswer": "Thanatos",
+            "wrongAnswer1": "Hades",
+            "wrongAnswer2": "Ares",
+            "wrongAnswer3": "Artemis"
+      },
+      {
+            "name": "Which demigod killed Medusa?",
+            "category": "Mythology",
+            "correctAnswer": "Perseus",
+            "wrongAnswer1": "Hercules",
+            "wrongAnswer2": "Odysseus",
+            "wrongAnswer3": "Achilles"
+      },
+      {
+            "name": "What Greek god kept Odysseus from returning home in The Odyssey?",
+            "category": "Mythology",
+            "correctAnswer": "Poseidon",
+            "wrongAnswer1": "Hades",
+            "wrongAnswer2": "Zeus",
+            "wrongAnswer3": "Aphrodite"
+      },
+      {
+            "name": "What was Heath Ledger's last role before he died?",
+            "category": "Movies",
+            "correctAnswer": "The Joker",
+            "wrongAnswer1": "Patrick Verona",
+            "wrongAnswer2": "William Thatcher",
+            "wrongAnswer3": "Ennis Del Mar"
+      },
+      {
+            "name": "Who was the first fully CGI character in a movie?",
+            "category": "Movies",
+            "correctAnswer": "Jar Jar Binks",
+            "wrongAnswer1": "The Troll in Harry Potter",
+            "wrongAnswer2": "Chewbacca",
+            "wrongAnswer3": "Jabba the Hutt"
+      },
+      {
+            "name": "What string of numbers and letters is hidden in each Pixar movie?",
+            "category": "Movies",
+            "correctAnswer": "A113",
+            "wrongAnswer1": "B93G",
+            "wrongAnswer2": "P1X4R",
+            "wrongAnswer3": "00PAS1"
+      },
+      {
+            "name": "What Disneyland ride was later turned into a movie franchise?",
+            "category": "Movies",
+            "correctAnswer": "Pirates of the Caribbean",
+            "wrongAnswer1": "Haunted Mansion",
+            "wrongAnswer2": "It's a Small World",
+            "wrongAnswer3": "Alien Encounter"
+      },
+      {
+            "name": "Who was going to be the main villain of the cancelled Spiderman 4 movie?",
+            "category": "Movies",
+            "correctAnswer": "The Vulture",
+            "wrongAnswer1": "Kraven the Hunter",
+            "wrongAnswer2": "Hobgoblin",
+            "wrongAnswer3": "Electro"
+      },
+      {
+            "name": "What platform was the first Kirby game playable on?",
+            "category": "Videogames",
+            "correctAnswer": "Gameboy",
+            "wrongAnswer1": "Gameboy Color",
+            "wrongAnswer2": "NES",
+            "wrongAnswer3": "SNES"
+      },
+      {
+            "name": "In what year did the first DOOM game release?",
+            "category": "Videogames",
+            "correctAnswer": "1993",
+            "wrongAnswer1": "1990",
+            "wrongAnswer2": "1997",
+            "wrongAnswer3": "1988"
+      },
+      {
+            "name": "What is the best selling Videogame of all time?",
+            "category": "Videogames",
+            "correctAnswer": "Minecraft",
+            "wrongAnswer1": "Grand Theft Auto V",
+            "wrongAnswer2": "Wii Sports",
+            "wrongAnswer3": "Super Mario Bros."
+      },
+      {
+            "name": "Which game in The Legend of Zelda series was released to commemorate the series' 25th anniversary?",
+            "category": "Videogames",
+            "correctAnswer": "Skyward Sword",
+            "wrongAnswer1": "Twilight Princess",
+            "wrongAnswer2": "Triforce Heroes",
+            "wrongAnswer3": "Breath of the Wild"
+      },
+      {
+            "name": "What soda brand made a videogame to attempt to promote their soda?",
+            "category": "Videogames",
+            "correctAnswer": "Pepsi",
+            "wrongAnswer1": "Coke a Cola",
+            "wrongAnswer2": "Dr. Pepper",
+            "wrongAnswer3": "Crush Orange"
+      },
+      {
+            "name": "Which of these board games is not a player vs. player game?",
+            "category": "Board Games",
+            "correctAnswer": "Pandemic",
+            "wrongAnswer1": "Santorini",
+            "wrongAnswer2": "Trouble",
+            "wrongAnswer3": "Exploding Kittens"
+      },
+      {
+            "name": "Which of these is not a player color in the base version of Catan?",
+            "category": "Board Games",
+            "correctAnswer": "Green",
+            "wrongAnswer1": "Orange",
+            "wrongAnswer2": "White",
+            "wrongAnswer3": "Red"
+      },
+      {
+            "name": "Which toy manufacturer makes the game Sorry?",
+            "category": "Board Games",
+            "correctAnswer": "Hasbro",
+            "wrongAnswer1": "Parker Brothers",
+            "wrongAnswer2": "Mattel",
+            "wrongAnswer3": "Spin Master"
+      },
+      {
+            "name": "How many rooms are on a traditional board for the game Clue?",
+            "category": "Board Games",
+            "correctAnswer": "9",
+            "wrongAnswer1": "7",
+            "wrongAnswer2": "11",
+            "wrongAnswer3": "10"
+      },
+      {
+            "name": "How many pawns are in a chess set?",
+            "category": "Board Games",
+            "correctAnswer": "16",
+            "wrongAnswer1": "18",
+            "wrongAnswer2": "14",
+            "wrongAnswer3": "20"
+      },
+      {
+            "name": "How many seasons of the Big Bang Theory are there?",
+            "category": "TV Shows",
+            "correctAnswer": "12",
+            "wrongAnswer1": "10",
+            "wrongAnswer2": "8",
+            "wrongAnswer3": "5"
+      },
+      {
+            "name": "Who plays the main character in House M.D.?",
+            "category": "TV Shows",
+            "correctAnswer": "Hugh Laurie",
+            "wrongAnswer1": "Matthew Perry",
+            "wrongAnswer2": "Robert Sean Leonard",
+            "wrongAnswer3": "Jim Parsons"
+      },
+      {
+            "name": "Which character died in season 3 of M*A*S*H?",
+            "category": "TV Shows",
+            "correctAnswer": "Henry Blake",
+            "wrongAnswer1": "Hawkeye",
+            "wrongAnswer2": "Radar",
+            "wrongAnswer3": "Klinger"
+      },
+      {
+            "name": "In what state does South Park take place?",
+            "category": "TV Shows",
+            "correctAnswer": "Colorado",
+            "wrongAnswer1": "Montana",
+            "wrongAnswer2": "Idaho",
+            "wrongAnswer3": "California"
+      },
+      {
+            "name": "What is Walter White's job in Breaking Bad?",
+            "category": "TV Shows",
+            "correctAnswer": "Chemistry teacher",
+            "wrongAnswer1": "Bank Manager",
+            "wrongAnswer2": "Engineer",
+            "wrongAnswer3": "Architect"
+      },
+      {
+            "name": "Which of these kids shows is no longer running?",
+            "category": "TV Shows",
+            "correctAnswer": "Arthur",
+            "wrongAnswer1": "Spongebob Squarepants",
+            "wrongAnswer2": "Pokemon",
+            "wrongAnswer3": "Lego Ninjago"
+      },
+      {
+            "name": "What was the first Netflix Original Series?",
+            "category": "TV Shows",
+            "correctAnswer": "House of Cards",
+            "wrongAnswer1": "Stranger Things",
+            "wrongAnswer2": "Outer Banks",
+            "wrongAnswer3": "The Witcher"
+      },
+      {
+            "name": "What is the longest running gameshow?",
+            "category": "TV Shows",
+            "correctAnswer": "The Price is Right",
+            "wrongAnswer1": "Wheel of Fortune",
+            "wrongAnswer2": "Jeopardy",
+            "wrongAnswer3": "Who Wants to be a Millionaire?"
+      },
+      {
+            "name": "Who was the first person to win Survivor?",
+            "category": "TV Shows",
+            "correctAnswer": "Richard Hatch",
+            "wrongAnswer1": "\"Boston\" Rob Mariano",
+            "wrongAnswer2": "Parvati Shallow",
+            "wrongAnswer3": "Sandra Diaz-Twine"
+      },
+      {
+            "name": "Out of these TV shows, which one's pilot episode is considered lost media?",
+            "category": "TV Shows",
+            "correctAnswer": "Johnny Bravo",
+            "wrongAnswer1": "Family Guy",
+            "wrongAnswer2": "Dora the Explorer",
+            "wrongAnswer3": "Phineas and Ferb"
+      },
+      {
+            "name": "What was the first ever Hot Wheels car to be produced?",
+            "category": "Toys",
+            "correctAnswer": "Custom Camaro",
+            "wrongAnswer1": "Ford J-Car",
+            "wrongAnswer2": "Custom Corvette",
+            "wrongAnswer3": "Deora"
+      },
+      {
+            "name": "LEGO is a toy company from what country?",
+            "category": "Toys",
+            "correctAnswer": "Denmark",
+            "wrongAnswer1": "Sweden",
+            "wrongAnswer2": "America",
+            "wrongAnswer3": "France"
+      },
+      {
+            "name": "Which of these toys is a marble that opens into the shape of a monster?",
+            "category": "Toys",
+            "correctAnswer": "Bakugan",
+            "wrongAnswer1": "Beyblade",
+            "wrongAnswer2": "Monsuno",
+            "wrongAnswer3": "Tech Deck"
+      },
+      {
+            "name": "What was the first toy line of action figures?",
+            "category": "Toys",
+            "correctAnswer": "G.I. Joe",
+            "wrongAnswer1": "Star Wars",
+            "wrongAnswer2": "He-Man",
+            "wrongAnswer3": "DC Super Heroes"
+      },
+      {
+            "name": "Which of these toy lines did not have a corresponding TV show?",
+            "category": "Toys",
+            "correctAnswer": "Stretch Armstrong",
+            "wrongAnswer1": "Power Rangers",
+            "wrongAnswer2": "Bakugan",
+            "wrongAnswer3": "Transformers"
+      },
+      {
+            "name": "Which of these single LEGO pieces sold for $18,001?",
+            "category": "Toys",
+            "correctAnswer": "14-karat gold Bionicle Mask",
+            "wrongAnswer1": "Mr. Gold's minifigure head",
+            "wrongAnswer2": "Star Wars molded Rancor",
+            "wrongAnswer3": "LEGO logo brick given to employees"
+      },
+      {
+            "name": "What did Nerf make before making Nerf Blasters?",
+            "category": "Toys",
+            "correctAnswer": "Foam balls",
+            "wrongAnswer1": "Super Soakers",
+            "wrongAnswer2": "T-shirts",
+            "wrongAnswer3": "Factory parts"
+      },
+      {
+            "name": "What toy was \"discovered\" by WWII scientists?",
+            "category": "Toys",
+            "correctAnswer": "Silly Putty",
+            "wrongAnswer1": "Bouncy Balls",
+            "wrongAnswer2": "Nerf Guns",
+            "wrongAnswer3": "Slinky"
+      },
+      {
+            "name": " In 1999, the National Security Agency banned what toy from its premises over concerns that the toy might be able to record and repeat classified information?",
+            "category": "Toys",
+            "correctAnswer": "Furby",
+            "wrongAnswer1": "Karaoke machine",
+            "wrongAnswer2": "Gameboy Camera",
+            "wrongAnswer3": "Yak Bak"
+      },
+      {
+            "name": "In what state did the first Toys 'R' Us open?",
+            "category": "Toys",
+            "correctAnswer": "Maryland",
+            "wrongAnswer1": "New York",
+            "wrongAnswer2": "North Carolina",
+            "wrongAnswer3": "Nevada"
+      },
+      {
+            "name": "On what day did the Japanese attack Pearl Harbor?",
+            "category": "American History",
+            "correctAnswer": "December 7th, 1941",
+            "wrongAnswer1": "November 11th, 1945",
+            "wrongAnswer2": "September 1st, 1939",
+            "wrongAnswer3": "February 5th, 1938"
+      },
+      {
+            "name": "What war has the highest number of American casualties?",
+            "category": "American History",
+            "correctAnswer": "Civil War",
+            "wrongAnswer1": "Revolutionary War",
+            "wrongAnswer2": "World War 2",
+            "wrongAnswer3": "Vietnam War"
+      },
+      {
+            "name": "Where was Martin Luther King Jr. born?",
+            "category": "American History",
+            "correctAnswer": "Atlanta, Georgia",
+            "wrongAnswer1": "Jackson, Mississippi",
+            "wrongAnswer2": "Baltimore, Maryland",
+            "wrongAnswer3": "Orlando, Florida"
+      },
+      {
+            "name": "In what year did the Gold Rush start?",
+            "category": "American History",
+            "correctAnswer": "1848",
+            "wrongAnswer1": "1856",
+            "wrongAnswer2": "1854",
+            "wrongAnswer3": "1866"
+      },
+      {
+            "name": "Who was the first president to be impeached",
+            "category": "American History",
+            "correctAnswer": "Andrew Johnson",
+            "wrongAnswer1": "Andrew Jackson",
+            "wrongAnswer2": "Millard Filmore",
+            "wrongAnswer3": "James Buchanan"
+      },
+      {
+            "name": "What amendment to the US Constitution gave women the right to vote?",
+            "category": "American History",
+            "correctAnswer": "19th Amendment",
+            "wrongAnswer1": "20th Amendment",
+            "wrongAnswer2": "17th Amendment",
+            "wrongAnswer3": "15th Amendment"
+      },
+      {
+            "name": "How many Federalist Papers did Alexander Hamilton write?",
+            "category": "American History",
+            "correctAnswer": "51",
+            "wrongAnswer1": "28",
+            "wrongAnswer2": "32",
+            "wrongAnswer3": "43"
+      },
+      {
+            "name": "In what year did humans first walk on the moon?",
+            "category": "American History",
+            "correctAnswer": "1969",
+            "wrongAnswer1": "1965",
+            "wrongAnswer2": "1971",
+            "wrongAnswer3": "1970"
+      },
+      {
+            "name": "How long was the first Thanksgiving Celebration?",
+            "category": "American History",
+            "correctAnswer": "3 days",
+            "wrongAnswer1": "1 day",
+            "wrongAnswer2": "5 days",
+            "wrongAnswer3": "13 days"
+      },
+      {
+            "name": "In what year was Osama bin Laden killed?",
+            "category": "American History",
+            "correctAnswer": "2011",
+            "wrongAnswer1": "2001",
+            "wrongAnswer2": "2004",
+            "wrongAnswer3": "2009"
+      },
+      {
+            "name": "Who sings the song \"Please Please Please\"?",
+            "category": "Music",
+            "correctAnswer": "Sabrina Carpenter",
+            "wrongAnswer1": "Taylor Swift",
+            "wrongAnswer2": "Ke$ha",
+            "wrongAnswer3": "Olivia Rodrigo"
+      },
+      {
+            "name": "What is Metallica's fourth studio album?",
+            "category": "Music",
+            "correctAnswer": "...And Justice for All",
+            "wrongAnswer1": "Master of Puppets",
+            "wrongAnswer2": "Loaded",
+            "wrongAnswer3": "Ride the Lightning"
+      },
+      {
+            "name": "What is the name of Charli XCX's Brat remix album?",
+            "category": "Music",
+            "correctAnswer": "Brat and it's Completely Different but also Still Brat",
+            "wrongAnswer1": "Brat 2",
+            "wrongAnswer2": "Bratty",
+            "wrongAnswer3": "Brat but Better"
+      },
+      {
+            "name": "Which of these groups is not in the Rock and Roll Hall of Fame?",
+            "category": "Music",
+            "correctAnswer": "Scorpions",
+            "wrongAnswer1": "ABBA",
+            "wrongAnswer2": "Black Sabbath",
+            "wrongAnswer3": "KISS"
+      },
+      {
+            "name": "What artist performed at the Eras Tour?",
+            "category": "Music",
+            "correctAnswer": "Taylor Swift",
+            "wrongAnswer1": "Ariane Grande",
+            "wrongAnswer2": "Lady Gaga",
+            "wrongAnswer3": "Diana Ross"
+      },
+      {
+            "name": "Which album is Twenty One Pilot's most streamed song, \"Stressed Out\" on?",
+            "category": "Music",
+            "correctAnswer": "Blurryface",
+            "wrongAnswer1": "Trench",
+            "wrongAnswer2": "Breach",
+            "wrongAnswer3": "Vessel"
+      },
+      {
+            "name": "Which artist performed at the Super Bowl halftime show in 2006?",
+            "category": "Music",
+            "correctAnswer": "The Rolling Stones",
+            "wrongAnswer1": "The Who",
+            "wrongAnswer2": "Paul McCartney",
+            "wrongAnswer3": "Aerosmith"
+      },
+      {
+            "name": "What year is the title of a song by the group Bowling For Soup?",
+            "category": "Music",
+            "correctAnswer": "1985",
+            "wrongAnswer1": "1969",
+            "wrongAnswer2": "1975",
+            "wrongAnswer3": "1991"
+      },
+      {
+            "name": "Which classical composer wrote \"Moonlight Sonata\"?",
+            "category": "Music",
+            "correctAnswer": "Ludwig von Beethoven",
+            "wrongAnswer1": "Wolfgang Amadeus Mozart",
+            "wrongAnswer2": "Antonio Vilvaldi",
+            "wrongAnswer3": "John Williams"
+      },
+      {
+            "name": "How many studio ablums did the band My Chemical Romance produce?",
+            "category": "Music",
+            "correctAnswer": "4",
+            "wrongAnswer1": "2",
+            "wrongAnswer2": "7",
+            "wrongAnswer3": "3"
+      },
+      {
+            "name": "What is the highest grossing R-Rated movie?",
+            "category": "Movies",
+            "correctAnswer": "Deadpool & Wolverine",
+            "wrongAnswer1": "Oppenheimer",
+            "wrongAnswer2": "Saving Private Ryan",
+            "wrongAnswer3": "It"
+      },
+      {
+            "name": "Which of these directors has never won and Oscar?",
+            "category": "Movies",
+            "correctAnswer": "Stanley Kubrick",
+            "wrongAnswer1": "George Lucas",
+            "wrongAnswer2": "Christopher Nolan",
+            "wrongAnswer3": "Ron Howard"
+      },
+      {
+            "name": "Which of these Marvel movies does not feature a cameo from Stan Lee?",
+            "category": "Movies",
+            "correctAnswer": "Ghost Rider",
+            "wrongAnswer1": "The Avengers",
+            "wrongAnswer2": "Spiderman",
+            "wrongAnswer3": "The Fantastic Four"
+      },
+      {
+            "name": "Which famous actor played the characters of Dracula, Count Dooku, and Saruman the White?",
+            "category": "Movies",
+            "correctAnswer": "Sir Christopher Lee",
+            "wrongAnswer1": "Sir Alec Guiness",
+            "wrongAnswer2": "Boris Karloff",
+            "wrongAnswer3": "Sir Ian Mckellen"
+      },
+      {
+            "name": "What was Dreamworks' sixth animated film?",
+            "category": "Movies",
+            "correctAnswer": "Shrek",
+            "wrongAnswer1": "Prince of Egypt",
+            "wrongAnswer2": "Antz",
+            "wrongAnswer3": "Kung Fu Panda"
+      },
+      {
+            "name": "Who created the character Super Mario?",
+            "category": "Videogames",
+            "correctAnswer": "Shigeru Miyamoto",
+            "wrongAnswer1": "Masahiro Sakura",
+            "wrongAnswer2": "Charles Martinet",
+            "wrongAnswer3": "Satoru Iwata"
+      },
+      {
+            "name": "Which Call of Duty game released in 2012?",
+            "category": "Videogames",
+            "correctAnswer": "Call of Duty: Black Ops II",
+            "wrongAnswer1": "Call of Duty: Modern Warfare",
+            "wrongAnswer2": "Call of Duty: Black Ops",
+            "wrongAnswer3": "Call of Duty: Modern Warfare 2"
+      },
+      {
+            "name": "The Fallout Series is developed and published by which game studio?",
+            "category": "Videogames",
+            "correctAnswer": "Bethedsa",
+            "wrongAnswer1": "Rock Star",
+            "wrongAnswer2": "Activision",
+            "wrongAnswer3": "Capcom"
+      },
+      {
+            "name": "What popular game was packaged with the Wii when it released in 2006?",
+            "category": "Videogames",
+            "correctAnswer": "Wii Sports",
+            "wrongAnswer1": "Wii Play",
+            "wrongAnswer2": "Super Mario Galaxy",
+            "wrongAnswer3": "Mario Kart Wii"
+      },
+      {
+            "name": "What iconic fighting game series features the quote \"Get over here!\"?",
+            "category": "Videogames",
+            "correctAnswer": "Mortal Kombat",
+            "wrongAnswer1": "Street Fighter",
+            "wrongAnswer2": "Tekken",
+            "wrongAnswer3": "Super Smash Bros."
+      },
+      {
+            "name": "What term is used to describe the zone that habitable planets reside in?",
+            "category": "Astronomy",
+            "correctAnswer": "Goldy Locks Zone",
+            "wrongAnswer1": "Safe Zone",
+            "wrongAnswer2": "Green Zone",
+            "wrongAnswer3": "Lightspeed Zone"
+      },
+      {
+            "name": "How many moons does Saturn currently have?",
+            "category": "Astronomy",
+            "correctAnswer": "285",
+            "wrongAnswer1": "166",
+            "wrongAnswer2": "202",
+            "wrongAnswer3": "197"
+      },
+      {
+            "name": "What color is the sun in our solar system?",
+            "category": "Astronomy",
+            "correctAnswer": "White",
+            "wrongAnswer1": "Orange",
+            "wrongAnswer2": "Yellow",
+            "wrongAnswer3": "Red"
+      },
+      {
+            "name": "In what mission did humans first land on the moon?",
+            "category": "Astronomy",
+            "correctAnswer": "Apollo 11",
+            "wrongAnswer1": "Apollo 8",
+            "wrongAnswer2": "Apollo 13",
+            "wrongAnswer3": "Pioneer 1"
+      },
+      {
+            "name": "How many days is a year on Mars?",
+            "category": "Astronomy",
+            "correctAnswer": "687 days",
+            "wrongAnswer1": "365 days",
+            "wrongAnswer2": "421 days",
+            "wrongAnswer3": "298 days"
+      },
+      {
+            "name": "Florida is an example of which geographic feature?",
+            "category": "Geography",
+            "correctAnswer": "Peninsula",
+            "wrongAnswer1": "Strait",
+            "wrongAnswer2": "Plateau",
+            "wrongAnswer3": "Basin"
+      },
+      {
+            "name": "Which country has the largest population in the world?",
+            "category": "Geography",
+            "correctAnswer": "China",
+            "wrongAnswer1": "United States of America",
+            "wrongAnswer2": "Russia",
+            "wrongAnswer3": "Brazil"
+      },
+      {
+            "name": "What is the coldest place on earth?",
+            "category": "Geography",
+            "correctAnswer": "Antarctica",
+            "wrongAnswer1": "The Arctic",
+            "wrongAnswer2": "Alaska",
+            "wrongAnswer3": "Mount Everest"
+      },
+      {
+            "name": "What body of water is between Ukraine and Turkey?",
+            "category": "Geography",
+            "correctAnswer": "The Black Sea",
+            "wrongAnswer1": "The Mediterranean Sea",
+            "wrongAnswer2": "The Bay of Biscay",
+            "wrongAnswer3": "The Adriatic Sea"
+      },
+      {
+            "name": "How many colors are on the South African Flag?",
+            "category": "Geography",
+            "correctAnswer": "6",
+            "wrongAnswer1": "3",
+            "wrongAnswer2": "2",
+            "wrongAnswer3": "5"
+      },
+      {
+            "name": "How many points is a touchdown worth in American Football?",
+            "category": "Sports",
+            "correctAnswer": "6 Points",
+            "wrongAnswer1": "7 Points",
+            "wrongAnswer2": "5 Points",
+            "wrongAnswer3": "3 Points"
+      },
+      {
+            "name": "Who is the youngest Basketball player to score 10,000 points?",
+            "category": "Sports",
+            "correctAnswer": "Lebron James",
+            "wrongAnswer1": "Michael Jordan",
+            "wrongAnswer2": "Larry Bird",
+            "wrongAnswer3": "Shaquille O'Neal"
+      },
+      {
+            "name": "What base is stolen the most in Baseball?",
+            "category": "Sports",
+            "correctAnswer": "2nd Base",
+            "wrongAnswer1": "1st Base",
+            "wrongAnswer2": "3rd Base",
+            "wrongAnswer3": "Home Plate"
+      },
+      {
+            "name": "How many teams has the Soccer player Lionel Messi played for?",
+            "category": "Sports",
+            "correctAnswer": "3 Teams",
+            "wrongAnswer1": "2 Teams",
+            "wrongAnswer2": "5 Teams",
+            "wrongAnswer3": "4 Teams"
+      },
+      {
+            "name": "Which NHL team won the Stanely Cup in 2015?",
+            "category": "Sports",
+            "correctAnswer": "Chicago Blackhawks",
+            "wrongAnswer1": "Pittsburgh Penguins",
+            "wrongAnswer2": "Boston Bruins",
+            "wrongAnswer3": "Vancouver Canucks"
+      },
+      {
+            "name": "What fast food chain has the most locations in the United States?",
+            "category": "Food",
+            "correctAnswer": "Subway",
+            "wrongAnswer1": "McDonald's",
+            "wrongAnswer2": "Burger King",
+            "wrongAnswer3": "Taco Bell"
+      },
+      {
+            "name": "When was the color blue added to M&Ms?",
+            "category": "Food",
+            "correctAnswer": "1995",
+            "wrongAnswer1": "1958",
+            "wrongAnswer2": "1966",
+            "wrongAnswer3": "1978"
+      },
+      {
+            "name": "Which of these candies has a roller coaster named after it at Hershey Park?",
+            "category": "Food",
+            "correctAnswer": "Jolly Rancher",
+            "wrongAnswer1": "Reese's Cup",
+            "wrongAnswer2": "Hershey Kiss",
+            "wrongAnswer3": "Twizzler"
+      },
+      {
+            "name": "What was the original price of a Reese's Cup?",
+            "category": "Food",
+            "correctAnswer": "1 Penny",
+            "wrongAnswer1": "1 Nickel",
+            "wrongAnswer2": "1 Dollar",
+            "wrongAnswer3": "2 Dimes"
+      },
+      {
+            "name": "Where were Spagetti noodles invented?",
+            "category": "Food",
+            "correctAnswer": "The Middle East",
+            "wrongAnswer1": "Italy",
+            "wrongAnswer2": "France",
+            "wrongAnswer3": "China"
+      },
+      {
+            "name": "What country has the largest population of Tigers?",
+            "category": "Animals",
+            "correctAnswer": "India",
+            "wrongAnswer1": "South Africa",
+            "wrongAnswer2": "Turkey",
+            "wrongAnswer3": "Pakistan"
+      },
+      {
+            "name": "How many legs does a lobster have?",
+            "category": "Animals",
+            "correctAnswer": "10 Legs",
+            "wrongAnswer1": "12 Legs",
+            "wrongAnswer2": "8 Legs",
+            "wrongAnswer3": "16 Legs"
+      },
+      {
+            "name": "What mammals have the thickest fur?",
+            "category": "Animals",
+            "correctAnswer": "Sea Otters",
+            "wrongAnswer1": "Polar Bears",
+            "wrongAnswer2": "Bison",
+            "wrongAnswer3": "Chincilla"
+      },
+      {
+            "name": "In what U.S. state are Black Widows not found in?",
+            "category": "Animals",
+            "correctAnswer": "Alaska",
+            "wrongAnswer1": "Hawaii",
+            "wrongAnswer2": "Montana",
+            "wrongAnswer3": "North Dakota"
+      },
+      {
+            "name": "What species of fish breed for life?",
+            "category": "Animals",
+            "correctAnswer": "Angelfish",
+            "wrongAnswer1": "Clown Fish",
+            "wrongAnswer2": "Blue Tang",
+            "wrongAnswer3": "Pufferfish"
+      },
+      {
+            "name": "How many teeth does a Great White Shark have?",
+            "category": "Animals",
+            "correctAnswer": "300 Teeth",
+            "wrongAnswer1": "200 Teeth",
+            "wrongAnswer2": "250 Teeth",
+            "wrongAnswer3": "450 Teeth"
+      },
+      {
+            "name": "What animal lays the largest eggs?",
+            "category": "Animals",
+            "correctAnswer": "Ostrich",
+            "wrongAnswer1": "Great White Shark",
+            "wrongAnswer2": "Flamingo",
+            "wrongAnswer3": "Emu"
+      },
+      {
+            "name": "What is the heaviest venomous snake found in the United States?",
+            "category": "Animals",
+            "correctAnswer": "Eastern Diamondback Rattlesnake",
+            "wrongAnswer1": "Timber Rattlesnake",
+            "wrongAnswer2": "Copperhead",
+            "wrongAnswer3": "Mojave Desert Sidewinder"
+      },
+      {
+            "name": "Which insect can turn its head 180 degrees?",
+            "category": "Animals",
+            "correctAnswer": "Praying Mantis",
+            "wrongAnswer1": "Centipede",
+            "wrongAnswer2": "Snail",
+            "wrongAnswer3": "Grasshopper"
+      },
+      {
+            "name": "Which of these big cats can't roar?",
+            "category": "Animals",
+            "correctAnswer": "Cheetah",
+            "wrongAnswer1": "Lion",
+            "wrongAnswer2": "Tiger",
+            "wrongAnswer3": "Jaquars"
+      },
+      {
+            "name": "Which port is the Telnet port?",
+            "category": "Computer Science",
+            "correctAnswer": "Port 23",
+            "wrongAnswer1": "Port 80",
+            "wrongAnswer2": "Port 50",
+            "wrongAnswer3": "Port 74"
+      },
+      {
+            "name": "What is the fourth layer of the Networking OSI Model?",
+            "category": "Computer Science",
+            "correctAnswer": "Layer 4",
+            "wrongAnswer1": "Layer 2",
+            "wrongAnswer2": "Layer 3",
+            "wrongAnswer3": "Layer 5"
+      },
+      {
+            "name": "Which progamming language was the first to be widely known and used?",
+            "category": "Computer Science",
+            "correctAnswer": "FORTRAN",
+            "wrongAnswer1": "Java",
+            "wrongAnswer2": "A",
+            "wrongAnswer3": "FLOW-MATIC"
+      },
+      {
+            "name": "Who technically owns Java?",
+            "category": "Computer Science",
+            "correctAnswer": "Oracle",
+            "wrongAnswer1": "Microsoft",
+            "wrongAnswer2": "Linux",
+            "wrongAnswer3": "Java Corporation"
+      },
+      {
+            "name": "Which Linux distribution is commonly used by cybersecurity specialists?",
+            "category": "Computer Science",
+            "correctAnswer": "Kali",
+            "wrongAnswer1": "Ubuntu",
+            "wrongAnswer2": "Debian",
+            "wrongAnswer3": "Red Hat"
+      },
+      {
+            "name": "When did the first iPhone release?",
+            "category": "Computer Science",
+            "correctAnswer": "2007",
+            "wrongAnswer1": "2004",
+            "wrongAnswer2": "2010",
+            "wrongAnswer3": "2005"
+      },
+      {
+            "name": "What kind of cyber attack involves overloading servers with excessive network traffic?",
+            "category": "Computer Science",
+            "correctAnswer": "DoS",
+            "wrongAnswer1": "Backdoor",
+            "wrongAnswer2": "SPAM",
+            "wrongAnswer3": "Ransomware"
+      },
+      {
+            "name": "Which piece of computer hardware is responsible for temporary storage?",
+            "category": "Computer Science",
+            "correctAnswer": "RAM",
+            "wrongAnswer1": "Hard Drive",
+            "wrongAnswer2": "CPU",
+            "wrongAnswer3": "GPU"
+      },
+      {
+            "name": "What does HTTP stand for?",
+            "category": "Computer Science",
+            "correctAnswer": "HyperText Transfer Protocal",
+            "wrongAnswer1": "HyperText Transport Protocol",
+            "wrongAnswer2": "Header Transport Text Protocol",
+            "wrongAnswer3": "Header Timeout Test Protocol"
+      },
+      {
+            "name": "What is the Python variable type for numbers with a decimal place called?",
+            "category": "Computer Science",
+            "correctAnswer": "Float",
+            "wrongAnswer1": "Double",
+            "wrongAnswer2": "Dec",
+            "wrongAnswer3": "Point"
+      },
+      {
+            "name": "How many gold medals did the United States win at the 2016 Summer Olympic Games?",
+            "category": "Sports",
+            "correctAnswer": "46 Gold Medals",
+            "wrongAnswer1": "37 Gold Medals",
+            "wrongAnswer2": "24 Gold Medals",
+            "wrongAnswer3": "32 Gold Medals"
+      },
+      {
+            "name": "Who was originally going to play Marty McFly in \"Back to the Future\"?",
+            "category": "Movies",
+            "correctAnswer": "Eric Stoltz",
+            "wrongAnswer1": "Patrick Swayze",
+            "wrongAnswer2": "Tom Cruise",
+            "wrongAnswer3": "Mark Hamill"
+      },
+      {
+            "name": "Which of these fruits is not a berry?",
+            "category": "Food",
+            "correctAnswer": "Strawberry",
+            "wrongAnswer1": "Cranberry",
+            "wrongAnswer2": "Grape",
+            "wrongAnswer3": "Tomato"
+      },
+      {
+            "name": "What was the first game in the Toys-to-Life genre of videogames?",
+            "category": "Videogames",
+            "correctAnswer": "Funkeys",
+            "wrongAnswer1": "Skylanders",
+            "wrongAnswer2": "Disney Infinity",
+            "wrongAnswer3": "LEGO Dimensions"
+      },
+      {
+            "name": "How many kids did the \"Brady Bunch\" have?",
+            "category": "TV Shows",
+            "correctAnswer": "6 Kids",
+            "wrongAnswer1": "5 Kids",
+            "wrongAnswer2": "8 Kids",
+            "wrongAnswer3": "10 Kids"
+      },
+      {
+            "name": "What toy was recalled in 1998 because the battery units were overheating?",
+            "category": "Toys",
+            "correctAnswer": "Power Wheels",
+            "wrongAnswer1": "Furby",
+            "wrongAnswer2": "Buzz Lightyear",
+            "wrongAnswer3": "Bop It"
+      },
+      {
+            "name": "Which planet in our solar system has the largest ocean?",
+            "category": "Astronomy",
+            "correctAnswer": "Jupiter",
+            "wrongAnswer1": "Neptune",
+            "wrongAnswer2": "Earth",
+            "wrongAnswer3": "Saturn"
+      },
+      {
+            "name": "What was the only thing left in Pandora's box when it was opened?",
+            "category": "Mythology",
+            "correctAnswer": "Hope",
+            "wrongAnswer1": "Famine",
+            "wrongAnswer2": "Joy",
+            "wrongAnswer3": "Strife"
+      },
+      {
+            "name": "Which of these things is Artemis not the goddess of?",
+            "category": "Mythology",
+            "correctAnswer": "The Moon",
+            "wrongAnswer1": "Hunting",
+            "wrongAnswer2": "Transitions",
+            "wrongAnswer3": "Wild Animals"
+      },
+      {
+            "name": "Which of these binary strings is equal to 27 in decimal?",
+            "category": "Computer Science",
+            "correctAnswer": "00011011",
+            "wrongAnswer1": "00011000",
+            "wrongAnswer2": "00010111",
+            "wrongAnswer3": "00100101"
+      },
+      {
+            "name": "Which of these bladed weapons was designed to have superior reach and power?",
+            "category": "Weapons",
+            "correctAnswer": "Scottish Claymore",
+            "wrongAnswer1": "Battle Axe",
+            "wrongAnswer2": "Flail",
+            "wrongAnswer3": "Morningstar"
+      },
+      {
+            "name": "Which of these weapons can hit with the force of a bullet?",
+            "category": "Weapons",
+            "correctAnswer": "Nunchucks",
+            "wrongAnswer1": "Flail",
+            "wrongAnswer2": "Javelin",
+            "wrongAnswer3": "Bow and Arrow"
+      },
+      {
+            "name": "Why were Kali Sticks invented?",
+            "category": "Weapons",
+            "correctAnswer": "Ban on Bladed Weapons",
+            "wrongAnswer1": "Lack of Materials",
+            "wrongAnswer2": "Made as a Training Tool",
+            "wrongAnswer3": "Used by Law Enforcement"
+      },
+      {
+            "name": "When was the first rocket launcher invented?",
+            "category": "Weapons",
+            "correctAnswer": "1380",
+            "wrongAnswer1": "1540",
+            "wrongAnswer2": "1940",
+            "wrongAnswer3": "1870"
+      },
+      {
+            "name": "What type of knife was invented to combat weapons with a long reach?",
+            "category": "Weapons",
+            "correctAnswer": "Deer Horn Knife",
+            "wrongAnswer1": "Kukri",
+            "wrongAnswer2": "Machete",
+            "wrongAnswer3": "Kunai"
+      },
+      {
+            "name": "Which of these weapons don't have Chinese origins?",
+            "category": "Weapons",
+            "correctAnswer": "War Hammer",
+            "wrongAnswer1": "Hook Swords",
+            "wrongAnswer2": "Butterfly Swords",
+            "wrongAnswer3": "Halberd"
+      },
+      {
+            "name": "What a Falx originally used for?",
+            "category": "Weapons",
+            "correctAnswer": "Cutting Wheat",
+            "wrongAnswer1": "Chopping Wood",
+            "wrongAnswer2": "Home Defense",
+            "wrongAnswer3": "Skinning Animals"
+      },
+      {
+            "name": "What country invented the AK-47?",
+            "category": "Weapons",
+            "correctAnswer": "Soviet Union",
+            "wrongAnswer1": "United States",
+            "wrongAnswer2": "Germany",
+            "wrongAnswer3": "North Korea"
+      },
+      {
+            "name": "Who requested the creation of the FN P90 Submachine Gun?",
+            "category": "Weapons",
+            "correctAnswer": "NATO",
+            "wrongAnswer1": "United Nations",
+            "wrongAnswer2": "United States Government",
+            "wrongAnswer3": "Soviet Union"
+      },
+      {
+            "name": "When were drones first used in warfare?",
+            "category": "Weapons",
+            "correctAnswer": "World War One",
+            "wrongAnswer1": "World War Two",
+            "wrongAnswer2": "Persian Gulf War",
+            "wrongAnswer3": "War on Terror"
+      }
+].map(q => new Question(q.name, q.category, q.correctAnswer, q.wrongAnswer1, q.wrongAnswer2, q.wrongAnswer3));
+
+    const gameState = { players: [], currentPlayerIndex: 0, wager: 0, categoryChoices: [], selectedCategory: null, currentQuestion: null, currentAnswers: [], usedQuestionNames: new Set(), turnNumber: 1, maxTurns: 10 };
+
+    function showScreen(screenId) { ["setup-screen", "start-screen", "question-screen", "result-screen", "game-over-screen"].forEach(id => document.getElementById(id).classList.add("hidden")); document.getElementById(screenId).classList.remove("hidden"); }
+    function shuffleArray(array) { const arr = [...array]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+    function getCurrentPlayer() { return gameState.players[gameState.currentPlayerIndex]; }
+
+    function buildPlayerNameFields() {
+      const mode = document.getElementById("game-mode").value;
+      const container = document.getElementById("player-name-fields");
+      container.innerHTML = "";
+
+      const count = mode === "single" ? 1 : Number(document.getElementById("player-count").value);
+
+      for (let i = 1; i <= count; i++) {
+        const label = document.createElement("label");
+        label.textContent = mode === "single" ? "Player name:" : "Player " + i + " name:";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.id = "player-name-" + i;
+        input.placeholder = mode === "single" ? "Your Name" : "Player " + i;
+        input.value = mode === "single" ? "Player" : "Player " + i;
+
+        container.appendChild(label);
+        container.appendChild(input);
+      }
+    }
+
+    function toggleMode() {
+      const mode = document.getElementById("game-mode").value;
+      const playerCountBox = document.getElementById("player-count").parentElement;
+
+      if (mode === "single") {
+        playerCountBox.style.display = "none";
+      } else {
+        playerCountBox.style.display = "block";
+      }
+
+      buildPlayerNameFields();
+    }
+
+    function startMultiplayerGame() {
+      const mode = document.getElementById("game-mode").value;
+      const count = mode === "single" ? 1 : Number(document.getElementById("player-count").value);
+      gameState.players = [];
+
+      for (let i = 1; i <= count; i++) {
+        const nameInput = document.getElementById("player-name-" + i);
+        const defaultName = mode === "single" ? "Player" : "Player " + i;
+        const name = nameInput.value.trim() || defaultName;
+        gameState.players.push({ name: name, score: 0 });
+      }
+
+      gameState.maxTurns = Number(document.getElementById("max-turns").value);
+      gameState.currentPlayerIndex = 0;
+      gameState.turnNumber = 1;
+      gameState.usedQuestionNames = new Set();
+      loadCategories();
+      showScreen("start-screen");
+    }
+
+    function renderScoreboard(targetId) {
+      const board = document.getElementById(targetId); board.innerHTML = "";
+      gameState.players.forEach((player, index) => {
+        const card = document.createElement("div"); card.className = "score-card" + (index === gameState.currentPlayerIndex ? " active" : "");
+        card.textContent = player.name + ": " + player.score; board.appendChild(card);
+      });
+    }
+
+    function getThreeUniqueQuestions() {
+      const available = allQuestions.filter(q => !gameState.usedQuestionNames.has(q.getName()));
+      const shuffled = shuffleArray(available.length ? available : allQuestions);
+      const chosen = []; const usedCategories = new Set();
+      for (const q of shuffled) {
+        if (!usedCategories.has(q.getCategory())) { chosen.push(q); usedCategories.add(q.getCategory()); }
+        if (chosen.length === 3) break;
+      }
+      return chosen;
+    }
+
+    function loadCategories() {
+      gameState.wager = 0; gameState.selectedCategory = null; gameState.currentQuestion = null; gameState.currentAnswers = []; gameState.categoryChoices = getThreeUniqueQuestions();
+      renderScoreboard("scoreboard");
+      document.getElementById("turn-label").textContent = getCurrentPlayer().name + "'s Turn (Turn " + gameState.turnNumber + " of " + gameState.maxTurns + ")";
+      const buttons = document.querySelectorAll(".category-btn");
+      buttons.forEach((btn, index) => {
+        const question = gameState.categoryChoices[index]; btn.textContent = question.getCategory(); btn.classList.remove("selected");
+        btn.onclick = function () { gameState.selectedCategory = question.getCategory(); document.querySelectorAll(".category-btn").forEach(b => b.classList.remove("selected")); this.classList.add("selected"); };
+      });
+      document.getElementById("wager").value = "";
+    }
+
+    function startQuestion() {
+      if (!gameState.selectedCategory) { alert("Please select a category first."); return; }
+      const wagerValue = Number(document.getElementById("wager").value);
+      if (!Number.isFinite(wagerValue) || wagerValue < 10 || wagerValue > 100 || wagerValue % 10 !== 0) { alert("Please enter a valid wager from 10 to 100 in multiples of 10."); return; }
+      gameState.wager = wagerValue;
+      const selected = gameState.categoryChoices.find(q => q.getCategory() === gameState.selectedCategory);
+      if (!selected) { alert("Could not find the selected category."); return; }
+      gameState.currentQuestion = selected; gameState.usedQuestionNames.add(selected.getName());
+      gameState.currentAnswers = shuffleArray([selected.getCorrectAnswer(), selected.getWrongAnswer1(), selected.getWrongAnswer2(), selected.getWrongAnswer3()]);
+      renderScoreboard("scoreboard-question");
+      document.getElementById("selected-category").textContent = "Category: " + selected.getCategory();
+      document.getElementById("current-player").textContent = "Current Player: " + getCurrentPlayer().name;
+      document.getElementById("question-text").textContent = selected.getName();
+      document.querySelectorAll(".answer-btn").forEach((btn, index) => { btn.disabled = false; btn.textContent = gameState.currentAnswers[index]; btn.onclick = function () { checkAnswer(this.textContent); }; });
+      showScreen("question-screen");
+    }
+
+    function checkAnswer(answerText) {
+      const currentPlayer = getCurrentPlayer();
+      const correct = answerText === gameState.currentQuestion.getCorrectAnswer();
+      if (correct) { currentPlayer.score += gameState.wager; document.getElementById("result-message").textContent = "Correct!"; document.getElementById("score-change").textContent = currentPlayer.name + " gained " + gameState.wager + " points."; }
+      else { currentPlayer.score -= gameState.wager; document.getElementById("result-message").textContent = "Incorrect! Correct answer: " + gameState.currentQuestion.getCorrectAnswer(); document.getElementById("score-change").textContent = currentPlayer.name + " lost " + gameState.wager + " points."; }
+      document.getElementById("updated-score").textContent = currentPlayer.name + "'s Score: " + currentPlayer.score;
+      renderScoreboard("scoreboard-result"); showScreen("result-screen");
+    }
+
+    function nextTurn() {
+      if (gameState.turnNumber >= gameState.maxTurns) { endGame(); return; }
+      gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.players.length;
+      gameState.turnNumber++; loadCategories(); showScreen("start-screen");
+    }
+
+    function endGame() {
+      renderScoreboard("scoreboard-final");
+      const sorted = [...gameState.players].sort((a, b) => b.score - a.score);
+      const topScore = sorted[0].score; const winners = sorted.filter(p => p.score === topScore);
+      document.getElementById("winner-message").textContent = winners.length === 1 ? "Winner: " + winners[0].name + " with " + topScore + " points!" : "Tie game: " + winners.map(p => p.name).join(", ") + " tied with " + topScore + " points!";
+      showScreen("game-over-screen");
+    }
+
+    document.getElementById("player-count").addEventListener("change", buildPlayerNameFields);
+    document.getElementById("game-mode").addEventListener("change", toggleMode);
+    document.getElementById("start-game-btn").addEventListener("click", startMultiplayerGame);
+    document.getElementById("begin-btn").addEventListener("click", startQuestion);
+    document.getElementById("next-turn-btn").addEventListener("click", nextTurn);
+    document.getElementById("play-again-btn").addEventListener("click", function () { showScreen("setup-screen"); buildPlayerNameFields(); });
+    document.getElementById("reset-game-btn").addEventListener("click", function () { showScreen("setup-screen"); buildPlayerNameFields(); });
+    toggleMode();
+  </script>
+</body>
+</html>
